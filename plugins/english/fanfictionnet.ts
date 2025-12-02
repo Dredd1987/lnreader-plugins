@@ -7,6 +7,7 @@ class FanFictionNet implements Plugin.PluginBase {
   id = 'fanfictionnet';
   name = 'FanFiction.Net';
   version = '1.0.0';
+  icon = 'src/en/fanfictionnet/icon.png';
   site = 'https://www.fanfiction.net';
 
   parseList($: CheerioAPI): Plugin.NovelItem[] {
