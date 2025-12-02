@@ -9,20 +9,40 @@ on:
       - 'public/**'
       - 'scripts/publish-plugins.sh'
       - '.github/workflows/publish-plugins.yml'
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: "Branch to run on"
+        required: false
+        default: "master"
+      all_branches:
+        description: "For forks, run --all-branches"
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
-  group: ${{ github.workflow }}
+  # Keep runs from different branches separate
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   publish:
     name: Publish Plugins
     runs-on: ubuntu-latest
+
+    # If your publish script creates commits/tags, you need contents: write
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.REPO_SCOPED_TOKEN }}
+          # Use your repo-scoped token if you have it; otherwise the default GITHUB_TOKEN works for same-repo writes.
+          token: ${{ secrets.REPO_SCOPED_TOKEN || github.token }}
+          # Honor manual branch selection if provided; falls back to the current ref.
+          ref: ${{ inputs.target_branch || github.ref_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -37,12 +57,19 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
 
+      # Upstream repo behavior
       - name: Publish Plugins (Main Repository)
         if: github.repository == 'LNReader/lnreader-plugins'
-        run: npm run publish:plugins 2>> $GITHUB_STEP_SUMMARY
+        run: npm run publish:plugins 2>> "$GITHUB_STEP_SUMMARY"
         shell: bash
 
-      - name: Publish Plugins (Fork - All Branches)
+      # Fork behavior (this will run in your repo Dredd1987/lnreader-plugins)
+      - name: Publish Plugins (Fork)
         if: github.repository != 'LNReader/lnreader-plugins'
-        run: npm run publish:plugins -- --all-branches
+        run: |
+          if [[ "${{ inputs.all_branches }}" == "true" ]]; then
+            npm run publish:plugins -- --all-branches
+          else
+            npm run publish:plugins
+          fi
         shell: bash
